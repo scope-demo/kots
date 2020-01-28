@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  scope: undefinedlabs/scope-go@0.0.1
+  scope: undefinedlabs/scope-go@dev:getfix
 
 workflows:
   scope_test:
