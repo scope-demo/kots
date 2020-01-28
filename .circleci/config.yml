@@ -1,0 +1,10 @@
+version: 2.1
+
+orbs:
+  scope: undefinedlabs/scope-go@0.0.1
+
+workflows:
+  scope_test:
+    jobs:
+      - scope/test:
+          dsn: $SCOPE_DSN
