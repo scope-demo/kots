@@ -1,0 +1,32 @@
+name: Scope
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Set up Go 1.13
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.13
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Scope for Go
+        uses: undefinedlabs/scope-for-go-action@codepath
+        with:
+          dsn: ${{secrets.SCOPE_DSN}}
+          auto-instrument: false
+          test-command: go test -tags "containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp" ./pkg/... ./cmd/... ./ffi/... -coverprofile cover.out -covermode=count
+          enable-benchmarks: false
+
+      - name: Upload Scope logs
+        if: always()
+        uses: actions/upload-artifact@v1
+        with:
+          name: Scope for Go logs
+          path: /home/runner/.scope-results
