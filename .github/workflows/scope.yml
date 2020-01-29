@@ -34,4 +34,4 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: Scope for Go logs
-        path: /home/runner/scope-logs
+        path: /home/runner/.scope-results
