@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.undefinedlabs.com/scopeagent"
 )
 
 func Test_UnmarshalValues(t *testing.T) {
@@ -85,7 +87,7 @@ func Test_UnmarshalValues(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			actual := HelmChart{}
@@ -267,7 +269,7 @@ func Test_HelmChartSpecRenderValues(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			h := HelmChartSpec{
@@ -384,7 +386,7 @@ func Test_MappedChartValueGetValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			actual, err := test.mappedChartValue.GetValue()

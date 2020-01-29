@@ -7,6 +7,8 @@ import (
 
 	kotsupload "github.com/replicatedhq/kots/pkg/upload"
 	"github.com/stretchr/testify/require"
+
+	"go.undefinedlabs.com/scopeagent"
 )
 
 func Test_Upload(t *testing.T) {
@@ -31,7 +33,7 @@ func Test_Upload(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.path, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.path, func(t *testing.T) {
 			req := require.New(t)
 
 			uploadOptions := kotsupload.UploadOptions{

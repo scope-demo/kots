@@ -1,6 +1,7 @@
 package pull
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ func TestRewriteUpstream(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.upstreamURI, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.upstreamURI, func(t *testing.T) {
 			actual := RewriteUpstream(test.upstreamURI)
 			assert.Equal(t, actual, test.expected)
 		})

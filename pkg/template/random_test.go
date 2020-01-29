@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"go.undefinedlabs.com/scopeagent"
 	_ "regexp"
 	"testing"
 	_ "unicode/utf8"
@@ -63,7 +64,7 @@ func TestGenerateRandomStringTemplates(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			// TODO
 
 			// req := require.New(t)

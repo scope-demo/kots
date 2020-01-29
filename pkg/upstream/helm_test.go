@@ -1,6 +1,7 @@
 package upstream
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"net/url"
 	"testing"
 
@@ -33,7 +34,7 @@ func Test_parseHelmURL(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			u, err := url.ParseRequestURI(test.uri)

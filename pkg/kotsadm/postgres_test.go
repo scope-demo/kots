@@ -1,6 +1,7 @@
 package kotsadm
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 
 	"github.com/replicatedhq/kots/pkg/kotsadm/types"
@@ -30,7 +31,7 @@ func Test_getPostgresYAML(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			manifests, err := getPostgresYAML(types.DeployOptions{

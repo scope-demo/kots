@@ -1,6 +1,7 @@
 package version
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +25,7 @@ func TestVersion(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
 			version = tt.want
@@ -64,7 +65,7 @@ func TestGitSHA(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
 			gitSHA = tt.sha
@@ -98,7 +99,7 @@ func TestBuildTime(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
 			buildTime = tt.timestring
@@ -128,7 +129,7 @@ func TestGetBuild(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
 			version = tt.version
@@ -176,7 +177,7 @@ func TestIsLatestRelease(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
 			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

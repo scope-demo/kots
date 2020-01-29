@@ -1,6 +1,7 @@
 package util
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func Test_CommonSlicePrefix(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			common := CommonSlicePrefix(test.first, test.second)
 			assert.Equal(t, test.expected, common)
 		})
@@ -70,7 +71,7 @@ func Test_SplitStringOnLen(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			parts, err := SplitStringOnLen(test.in, test.max)
@@ -109,7 +110,7 @@ func TestIntPointer(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 			got := IntPointer(tt.x)
 			req.Equal(tt.want, *got)

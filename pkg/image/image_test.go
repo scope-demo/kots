@@ -2,6 +2,7 @@ package image
 
 import (
 	"fmt"
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 
 	"github.com/replicatedhq/kots/pkg/docker/registry"
@@ -65,7 +66,7 @@ func Test_ImageNameFromNameParts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			image, err := ImageInfoFromFile(registryOps, test.parts)
 			if test.isError {
 				assert.Error(t, err)
@@ -118,7 +119,7 @@ func TestDestRef(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			if got := DestRef(tt.args.registry, tt.args.srcImage); got != tt.want {
 				t.Errorf("DestImageName() = %v, want %v", got, tt.want)
 			}
@@ -247,7 +248,7 @@ func Test_buildImageAlts(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 			got, err := buildImageAlts(tt.destRegistry, tt.image)
 			req.NoError(err)
@@ -294,7 +295,7 @@ func Test_stripImageTag(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(tt.name, func(t *testing.T) {
 			if got := stripImageTag(tt.image); got != tt.want {
 				t.Errorf("stripImageTag() = %v, want %v", got, tt.want)
 			}

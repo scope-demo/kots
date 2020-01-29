@@ -2,6 +2,7 @@ package kotsadm
 
 import (
 	"fmt"
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 	"time"
 
@@ -28,7 +29,7 @@ func Test_getMigrationsYAML(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			deployOptions := types.DeployOptions{

@@ -11,6 +11,8 @@ import (
 	"github.com/replicatedhq/kots/pkg/pull"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.undefinedlabs.com/scopeagent"
 )
 
 type replicatedPullTest struct {
@@ -41,7 +43,7 @@ func Test_PullReplicated(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			archiveData, err := ioutil.ReadFile(path.Join(test.testDir, "archive.tar.gz"))
@@ -61,7 +63,7 @@ func Test_PullReplicated(t *testing.T) {
 			pullOptions := pull.PullOptions{
 				RootDir:             actualDir,
 				LicenseFile:         path.Join(test.testDir, "license.yaml"),
-				Namespace: namespace,
+				Namespace:           namespace,
 				ExcludeAdminConsole: true,
 				ExcludeKotsKinds:    true,
 				Silent:              true,

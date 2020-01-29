@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,7 @@ func Test_Comparable(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			c1, err := NewCursor(test.c1)
 			if test.c1Error {
 				assert.Error(t, err)

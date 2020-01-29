@@ -1,6 +1,7 @@
 package upstream
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"net/url"
 	"testing"
 
@@ -53,7 +54,7 @@ func Test_parseReplicatedURL(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			u, err := url.ParseRequestURI(test.uri)
@@ -141,7 +142,7 @@ func Test_releaseToFiles(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name, func(t *testing.T) {
 			req := require.New(t)
 
 			actual, err := releaseToFiles(test.release)

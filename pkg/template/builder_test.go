@@ -1,6 +1,7 @@
 package template
 
 import (
+	"go.undefinedlabs.com/scopeagent"
 	"testing"
 	"text/template"
 
@@ -210,18 +211,18 @@ func TestBuildStrings(t *testing.T) {
 	builder.AddCtx(testContext{})
 
 	for _, test := range cases {
-		t.Run(test.name(), func(t *testing.T) {
+		scopeagent.GetTest(t).Run(test.name(), func(t *testing.T) {
 			test.runTest(t, builder)
 		})
 	}
 
-	t.Run("Test bad values", func(t *testing.T) {
+	scopeagent.GetTest(t).Run("Test bad values", func(t *testing.T) {
 		built, err := builder.String("{{repl ParseBool True}}")
 		require.New(t).Error(err)
 		require.New(t).Equal("", built)
 	})
 
-	t.Run("Test broken template syntax", func(t *testing.T) {
+	scopeagent.GetTest(t).Run("Test broken template syntax", func(t *testing.T) {
 		built, err := builder.String("{{repl SomeFunc")
 		require.New(t).Error(err)
 		require.New(t).Equal("", built)
