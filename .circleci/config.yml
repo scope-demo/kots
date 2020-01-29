@@ -9,3 +9,4 @@ workflows:
           dsn: $SCOPE_DSN
           auto-instrument: false
           test-command: go test -tags "containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp" ./pkg/... ./cmd/... ./ffi/... -coverprofile cover.out -covermode=count
+          enable-benchmarks: false
