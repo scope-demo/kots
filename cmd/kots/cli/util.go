@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -13,11 +14,20 @@ var (
 )
 
 func ExpandDir(input string) string {
-	if !strings.HasPrefix(input, "~") {
-		return input
+	if input == "" {
+		return ""
 	}
 
-	return filepath.Join(homeDir(), input[1:])
+	if strings.HasPrefix(input, "~") {
+		input = filepath.Join(homeDir(), strings.TrimPrefix(input, "~"))
+	}
+
+	uploadPath, err := filepath.Abs(input)
+	if err != nil {
+		panic(errors.Wrapf(err, "unable to expand %q to absolute path", input))
+	}
+
+	return uploadPath
 }
 
 func homeDir() string {

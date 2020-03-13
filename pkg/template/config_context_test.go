@@ -15,6 +15,7 @@ func TestBuilder_NewConfigContext(t *testing.T) {
 		configGroups    []kotsv1beta1.ConfigGroup
 		templateContext map[string]ItemValue
 		cipher          *crypto.AESCipher
+		license         *kotsv1beta1.License
 	}
 	tests := []struct {
 		name string
@@ -284,6 +285,71 @@ func TestBuilder_NewConfigContext(t *testing.T) {
 				},
 			}},
 		},
+		{
+			name: "chain from license template func",
+			args: args{
+				configGroups: []kotsv1beta1.ConfigGroup{
+					{
+						Name:        "abc",
+						Title:       "abc",
+						Description: "abc",
+						Items: []kotsv1beta1.ConfigItem{
+							{
+								Name:    "abcItem",
+								Type:    "text",
+								Title:   "abcItem",
+								Default: multitype.BoolOrString{},
+								Value: multitype.BoolOrString{
+									Type:   multitype.String,
+									StrVal: `license val: repl{{ LicenseFieldValue "abcField" }}`},
+							},
+						},
+					},
+					{
+						Name:        "chain",
+						Title:       "chain",
+						Description: "chain",
+						Items: []kotsv1beta1.ConfigItem{
+							{
+								Name:    "chainItem",
+								Type:    "text",
+								Title:   "chainItem",
+								Default: multitype.BoolOrString{},
+								Value: multitype.BoolOrString{
+									Type:   multitype.String,
+									StrVal: `chain val: repl{{ ConfigOption "abcItem" }}`},
+							},
+						},
+					},
+				},
+				templateContext: map[string]ItemValue{},
+				cipher:          nil,
+				license: &kotsv1beta1.License{
+					Spec: kotsv1beta1.LicenseSpec{
+						Entitlements: map[string]kotsv1beta1.EntitlementField{
+							"abcField": kotsv1beta1.EntitlementField{
+								Value: kotsv1beta1.EntitlementValue{
+									Type:   kotsv1beta1.String,
+									StrVal: "abcValue",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &ConfigCtx{
+				ItemValues: map[string]ItemValue{
+					"abcItem": {
+						Value:   "license val: abcValue",
+						Default: "",
+					},
+					"chainItem": {
+						Value:   "chain val: license val: abcValue",
+						Default: "",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -292,13 +358,96 @@ func TestBuilder_NewConfigContext(t *testing.T) {
 
 			req := require.New(t)
 
+			// expect license to be the one passed as an arg unless the test overrides this
+			if tt.want.license == nil && tt.args.license != nil {
+				tt.want.license = tt.args.license
+			}
+
 			builder := Builder{}
 			builder.AddCtx(StaticCtx{})
 
 			localRegistry := LocalRegistry{}
-			got, err := builder.NewConfigContext(tt.args.configGroups, tt.args.templateContext, localRegistry, tt.args.cipher)
+			got, err := builder.newConfigContext(tt.args.configGroups, tt.args.templateContext, localRegistry, tt.args.cipher, tt.args.license)
 			req.NoError(err)
 			req.Equal(tt.want, got)
+		})
+	}
+}
+
+func Test_localImageName(t *testing.T) {
+	ctxWithRegistry := ConfigCtx{
+		LocalRegistry: LocalRegistry{
+			Host:      "my.registry.com",
+			Namespace: "my_namespace",
+			Username:  "my_user",
+			Password:  "my_password",
+		},
+
+		license: &kotsv1beta1.License{
+			Spec: kotsv1beta1.LicenseSpec{
+				Endpoint: "replicated.registry.com",
+			},
+		},
+	}
+
+	ctxWithoutRegistry := ConfigCtx{
+		LocalRegistry: LocalRegistry{},
+
+		license: &kotsv1beta1.License{
+			Spec: kotsv1beta1.LicenseSpec{
+				AppSlug:  "myslug",
+				Endpoint: "replicated.registry.com",
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		ctx      ConfigCtx
+		image    string
+		expected string
+	}{
+		{
+			name:     "rewrite public image to local",
+			ctx:      ctxWithRegistry,
+			image:    "nginx:latest",
+			expected: "my.registry.com/my_namespace/nginx:latest",
+		},
+		{
+			name:     "rewrite private image to local",
+			ctx:      ctxWithRegistry,
+			image:    "registry.replicated.com/kots/myimage:abcd123",
+			expected: "my.registry.com/my_namespace/myimage:abcd123",
+		},
+		{
+			name:     "do not rewrite public image",
+			ctx:      ctxWithoutRegistry,
+			image:    "redis:latest",
+			expected: "redis:latest",
+		},
+		{
+			name:     "rewrite private image to proxy",
+			ctx:      ctxWithoutRegistry,
+			image:    "quay.io/replicated/myimage@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			expected: "proxy.replicated.com/proxy/myslug/quay.io/replicated/myimage@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+		},
+		{
+			name:     "do not rewrite private replicated image to proxy",
+			ctx:      ctxWithoutRegistry,
+			image:    "registry.replicated.com/kots/myimage:v1.13.0",
+			expected: "registry.replicated.com/kots/myimage:v1.13.0",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scopetest := scopeagent.StartTest(t)
+			defer scopetest.End()
+
+			req := require.New(t)
+
+			newName := test.ctx.localImageName(test.image)
+			req.Equal(test.expected, newName)
 		})
 	}
 }

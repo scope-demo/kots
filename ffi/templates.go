@@ -3,6 +3,7 @@ package main
 import "C"
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,7 +19,7 @@ import (
 )
 
 //export RenderFile
-func RenderFile(socket string, filePath string, archivePath string, registryHost string, registryNamespace string, registryUsername string, registryPassword string) {
+func RenderFile(socket string, filePath string, archivePath string, registryJson string) {
 	go func() {
 		var ffiResult *FFIResult
 
@@ -30,6 +31,18 @@ func RenderFile(socket string, filePath string, archivePath string, registryHost
 		defer func() {
 			statusClient.end(ffiResult)
 		}()
+
+		registryInfo := struct {
+			Host      string `json:"registryHostname"`
+			Username  string `json:"registryUsername"`
+			Password  string `json:"registryPassword"`
+			Namespace string `json:"namespace"`
+		}{}
+		if err := json.Unmarshal([]byte(registryJson), &registryInfo); err != nil {
+			fmt.Printf("failed to unmarshal registry info: %s\n", err.Error())
+			ffiResult = NewFFIResult(-1).WithError(err)
+			return
+		}
 
 		tmpRoot, err := ioutil.TempDir("", "kots")
 		if err != nil {
@@ -49,9 +62,6 @@ func RenderFile(socket string, filePath string, archivePath string, registryHost
 			ffiResult = NewFFIResult(1).WithError(err)
 			return
 		}
-
-		builder := template.Builder{}
-		builder.AddCtx(template.StaticCtx{})
 
 		// look for config
 		config, values, license, installation, err := findConfig(tmpRoot)
@@ -86,30 +96,21 @@ func RenderFile(socket string, filePath string, archivePath string, registryHost
 		}
 
 		localRegistry := template.LocalRegistry{
-			Host:      registryHost,
-			Namespace: registryNamespace,
-			Username:  registryUsername,
-			Password:  registryPassword,
+			Host:      registryInfo.Host,
+			Namespace: registryInfo.Namespace,
+			Username:  registryInfo.Username,
+			Password:  registryInfo.Password,
 		}
 
-		configCtx, err := builder.NewConfigContext(configGroups, templateContextValues, localRegistry, cipher)
+		builder, configVals, err := template.NewBuilder(configGroups, templateContextValues, localRegistry, cipher, license)
 		if err != nil {
 			fmt.Printf("failed to create config context %s\n", err.Error())
 			ffiResult = NewFFIResult(1).WithError(err)
 			return
 		}
 
-		builder.AddCtx(configCtx)
-
 		if config != nil {
-			kotsconfig.ApplyValuesToConfig(config, configCtx.ItemValues)
-		}
-
-		if license != nil {
-			licenseCtx := template.LicenseCtx{
-				License: license,
-			}
-			builder.AddCtx(licenseCtx)
+			kotsconfig.ApplyValuesToConfig(config, configVals)
 		}
 
 		inputContent, err := ioutil.ReadFile(filePath)

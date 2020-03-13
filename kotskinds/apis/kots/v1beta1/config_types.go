@@ -39,10 +39,11 @@ type ConfigItem struct {
 	Default     multitype.BoolOrString `json:"default,omitempty"`
 	Value       multitype.BoolOrString `json:"value,omitempty"`
 	Data        string                 `json:"data,omitempty"`
+	Error       string                 `json:"error,omitempty"`
 	MultiValue  []string               `json:"multi_value,omitempty"`
 	ReadOnly    bool                   `json:"readonly,omitempty"`
 	WriteOnce   bool                   `json:"write_once,omitempty"`
-	When        string                 `json:"when,omitempty"`
+	When        multitype.QuotedBool   `json:"when,omitempty"`
 	Multiple    bool                   `json:"multiple,omitempty"`
 	Hidden      bool                   `json:"hidden,omitempty"`
 	Position    int                    `json:"-"`

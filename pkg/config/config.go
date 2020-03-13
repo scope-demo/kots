@@ -15,11 +15,11 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-func TemplateConfig(log *logger.Logger, configSpecData string, configValuesData string, localRegistry template.LocalRegistry) (string, error) {
-	return templateConfig(log, configSpecData, configValuesData, localRegistry, MarshalConfig)
+func TemplateConfig(log *logger.Logger, configSpecData string, configValuesData string, licenseData string, localRegistry template.LocalRegistry) (string, error) {
+	return templateConfig(log, configSpecData, configValuesData, licenseData, localRegistry, MarshalConfig)
 }
 
-func templateConfig(log *logger.Logger, configSpecData string, configValuesData string, localRegistry template.LocalRegistry, marshalFunc func(config *kotsv1beta1.Config) (string, error)) (string, error) {
+func templateConfig(log *logger.Logger, configSpecData string, configValuesData string, licenseData string, localRegistry template.LocalRegistry, marshalFunc func(config *kotsv1beta1.Config) (string, error)) (string, error) {
 	// This function will
 	// 1. unmarshal config
 	// 2. replace all item values with values that already exist
@@ -27,16 +27,24 @@ func templateConfig(log *logger.Logger, configSpecData string, configValuesData 
 	// 4. re-marshal it (with an unlimited line length)
 	// 5. put new config yaml through templating engine
 	// This process will re-order items and discard comments, so it should not be saved.
-
 	decode := scheme.Codecs.UniversalDeserializer().Decode
-	obj, _, err := decode([]byte(configSpecData), nil, nil) // TODO fix decode of boolstrings
+	obj, gvk, err := decode([]byte(licenseData), nil, nil)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to decode license data")
+	}
+	if gvk.Group != "kots.io" || gvk.Version != "v1beta1" || gvk.Kind != "License" {
+		return "", errors.Errorf("expected License, but found %s/%s/%s", gvk.Group, gvk.Version, gvk.Kind)
+	}
+	license := obj.(*kotsv1beta1.License)
+
+	obj, gvk, err = decode([]byte(configSpecData), nil, nil) // TODO fix decode of boolstrings
 	if err != nil {
 		return "", errors.Wrap(err, "failed to decode config data")
 	}
+	if gvk.Group != "kots.io" || gvk.Version != "v1beta1" || gvk.Kind != "Config" {
+		return "", errors.Errorf("expected Config, but found %s/%s/%s", gvk.Group, gvk.Version, gvk.Kind)
+	}
 	config := obj.(*kotsv1beta1.Config)
-
-	builder := template.Builder{}
-	builder.AddCtx(template.StaticCtx{})
 
 	// get template context from config values
 	templateContext, err := base.UnmarshalConfigValuesContent([]byte(configValuesData))
@@ -45,19 +53,16 @@ func templateConfig(log *logger.Logger, configSpecData string, configValuesData 
 		templateContext = map[string]template.ItemValue{}
 	}
 
-	// add config context
-	configCtx, err := builder.NewConfigContext(config.Spec.Groups, templateContext, localRegistry, nil)
+	builder, configVals, err := template.NewBuilder(config.Spec.Groups, templateContext, localRegistry, nil, license)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create config context")
 	}
 
-	ApplyValuesToConfig(config, configCtx.ItemValues)
+	ApplyValuesToConfig(config, configVals)
 	configDocWithData, err := marshalFunc(config)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal config")
 	}
-
-	builder.AddCtx(configCtx)
 
 	rendered, err := builder.RenderTemplate("config", string(configDocWithData))
 	if err != nil {

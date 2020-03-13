@@ -2,16 +2,17 @@ package template
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"path"
 	"regexp"
-	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
 	kotsv1beta1 "github.com/replicatedhq/kots/kotskinds/apis/kots/v1beta1"
 	"github.com/replicatedhq/kots/pkg/crypto"
-	"k8s.io/kubernetes/pkg/credentialprovider"
+	"github.com/replicatedhq/kots/pkg/docker/registry"
+	"github.com/replicatedhq/kots/pkg/image"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -62,19 +63,23 @@ func (i ItemValue) DefaultStr() string {
 type ConfigCtx struct {
 	ItemValues    map[string]ItemValue
 	LocalRegistry LocalRegistry
+
+	license *kotsv1beta1.License // Another agument for unifying all these contexts
 }
 
-// NewConfigContext creates and returns a context for template rendering
-func (b *Builder) NewConfigContext(configGroups []kotsv1beta1.ConfigGroup, existingValues map[string]ItemValue, localRegistry LocalRegistry, cipher *crypto.AESCipher) (*ConfigCtx, error) {
+// newConfigContext creates and returns a context for template rendering
+func (b *Builder) newConfigContext(configGroups []kotsv1beta1.ConfigGroup, existingValues map[string]ItemValue, localRegistry LocalRegistry, cipher *crypto.AESCipher, license *kotsv1beta1.License) (*ConfigCtx, error) {
 	configCtx := &ConfigCtx{
 		ItemValues:    existingValues,
 		LocalRegistry: localRegistry,
+		license:       license,
 	}
 
 	builder := Builder{
 		Ctx: []Ctx{
 			configCtx,
 			StaticCtx{},
+			&LicenseCtx{License: license},
 		},
 	}
 
@@ -82,6 +87,18 @@ func (b *Builder) NewConfigContext(configGroups []kotsv1beta1.ConfigGroup, exist
 	for _, configGroup := range configGroups {
 		for _, configItem := range configGroup.Items {
 			configItemsByName[configItem.Name] = configItem
+
+			// decrypt password if it exists
+			if configItem.Type == "password" {
+				existingVal, ok := existingValues[configItem.Name]
+				if ok && existingVal.HasValue() {
+					val, err := decrypt(existingVal.ValueStr(), cipher)
+					if err == nil {
+						existingVal.Value = val
+						existingValues[configItem.Name] = existingVal
+					}
+				}
+			}
 		}
 	}
 
@@ -101,8 +118,8 @@ func (b *Builder) NewConfigContext(configGroups []kotsv1beta1.ConfigGroup, exist
 
 			if !isReadOnly(configItem) {
 				// if item is editable and the live state is valid, skip the rest of this -
-				val, ok := configCtx.ItemValues[node]
-				if ok && val.HasValue() {
+				_, ok := configCtx.ItemValues[node]
+				if ok {
 					continue
 				}
 			}
@@ -115,14 +132,6 @@ func (b *Builder) NewConfigContext(configGroups []kotsv1beta1.ConfigGroup, exist
 				Default: builtDefault,
 			}
 
-			//
-			if configItem.Type == "password" && itemValue.HasValue() {
-				// FIXME: this temporarily ignores errors and falls back on old behavior
-				val, err := decrypt(itemValue.ValueStr(), cipher)
-				if err == nil {
-					itemValue.Value = val
-				}
-			}
 			configCtx.ItemValues[configItem.Name] = itemValue
 		}
 
@@ -239,17 +248,43 @@ func (ctx ConfigCtx) localRegistryNamespace() string {
 	return ctx.LocalRegistry.Namespace
 }
 
-func (ctx ConfigCtx) localImageName(image string) string {
-	if ctx.LocalRegistry.Host == "" {
-		return image
+func (ctx ConfigCtx) localImageName(imageRef string) string {
+	// If there's a private registry. Always rewrite everything.  This covers airgap installs too.
+	if ctx.LocalRegistry.Host != "" {
+		ref, err := image.RefFromImage(imageRef)
+		if err != nil {
+			// TODO: log
+			return ""
+		}
+		ref.Domain = ctx.localRegistryHost()
+		ref.Name = path.Join(ctx.localRegistryAddress(), ref.NameBase())
+		return ref.String()
 	}
 
-	_, _, imageName, tag, err := parseImageName(image)
+	// Not airgap and no local registry.  Rewrite images that are private only.
+
+	isPrivate, err := image.IsPrivateImage(imageRef)
 	if err != nil {
+		// TODO: log
 		return ""
 	}
 
-	return fmt.Sprintf("%s/%s:%s", ctx.localRegistryAddress(), imageName, tag)
+	if !isPrivate {
+		return imageRef
+	}
+
+	proxyInfo := registry.ProxyEndpointFromLicense(ctx.license)
+	registryOptions := registry.RegistryOptions{
+		Endpoint:      proxyInfo.Registry,
+		ProxyEndpoint: proxyInfo.Proxy,
+	}
+	newImage, err := image.RewritePrivateImage(registryOptions, imageRef, ctx.license.Spec.AppSlug)
+	if err != nil {
+		// TODO: log
+		return ""
+	}
+
+	return newImage
 }
 
 func (ctx ConfigCtx) hasLocalRegistry() bool {
@@ -257,25 +292,37 @@ func (ctx ConfigCtx) hasLocalRegistry() bool {
 }
 
 func (ctx ConfigCtx) localRegistryImagePullSecret() string {
-	dockerConfigEntry := credentialprovider.DockerConfigEntry{
-		Username: ctx.LocalRegistry.Username,
-		Password: ctx.LocalRegistry.Password,
+	var secret *corev1.Secret
+	if ctx.LocalRegistry.Host != "" {
+		s, err := registry.PullSecretForRegistries(
+			[]string{ctx.LocalRegistry.Host},
+			ctx.LocalRegistry.Username,
+			ctx.LocalRegistry.Password,
+			"default", // this value doesn't matter
+		)
+		if err != nil {
+			return ""
+		}
+		secret = s
+	} else {
+		proxyInfo := registry.ProxyEndpointFromLicense(ctx.license)
+		s, err := registry.PullSecretForRegistries(
+			proxyInfo.ToSlice(),
+			ctx.license.Spec.LicenseID,
+			ctx.license.Spec.LicenseID,
+			"default", // this value doesn't matter
+		)
+		if err != nil {
+			return ""
+		}
+		secret = s
 	}
-
-	dockerConfigJSON := credentialprovider.DockerConfigJson{
-		Auths: credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
-			ctx.LocalRegistry.Host: dockerConfigEntry,
-		}),
-	}
-
-	b, err := json.Marshal(dockerConfigJSON)
-	if err != nil {
-		fmt.Printf("%#v\n", err)
+	dockerConfig, found := secret.Data[".dockerconfigjson"]
+	if !found {
 		return ""
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(b)
-	return encoded
+	return base64.StdEncoding.EncodeToString(dockerConfig)
 }
 
 func (ctx ConfigCtx) getConfigOptionValue(itemName string) (string, error) {
@@ -307,34 +354,4 @@ func decrypt(input string, cipher *crypto.AESCipher) (string, error) {
 	}
 
 	return string(decrypted), nil
-}
-
-func parseImageName(imageName string) (string, string, string, string, error) {
-	matches := dockerImageNameRegex.FindStringSubmatch(imageName)
-
-	if len(matches) != 5 {
-		return "", "", "", "", fmt.Errorf("Expected 5 matches in regex, but found %d", len(matches))
-	}
-
-	hostname := matches[1]
-	namespace := matches[2]
-	image := matches[3]
-	tag := matches[4]
-
-	if namespace == "" && hostname != "" {
-		if !strings.Contains(hostname, ".") && !strings.Contains(hostname, ":") {
-			namespace = hostname
-			hostname = ""
-		}
-	}
-
-	if hostname == "" {
-		hostname = "index.docker.io"
-	}
-
-	if namespace == "" {
-		namespace = "library"
-	}
-
-	return hostname, namespace, image, tag, nil
 }
