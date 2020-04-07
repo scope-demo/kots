@@ -25,7 +25,7 @@ jobs:
       uses: undefinedlabs/scope-for-go-action@v2
       with:
         dsn: ${{secrets.SCOPE_DSN}}
-        version: test-code-api
+        version: master
 
     - name: Upload Scope logs
       if: always()
